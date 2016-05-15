@@ -92,6 +92,11 @@ def load_dataset(filename, word_to_num, class_to_num,
       y.append(class_to_num[class_name])
   return np.array(X), np.array(y), np.array(lengths)
 
+def generate_onehot(y, num_classes):
+  y_t = np.zeros((len(y), num_classes))
+  y_t[np.arange(len(y)), y] = 1
+  return y_t
+
 def data_iterator(orig_X, orig_lengths, orig_y=None, batch_size=32, label_size=2, shuffle=False):
   # Optionally shuffle the data before training
   if shuffle:

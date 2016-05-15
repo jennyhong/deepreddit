@@ -31,11 +31,15 @@ class BaselineModel(LanguageModel):
 
     self.X_train, self.y_train, self.lengths_train = reddit_data.load_dataset('data/babyTrain',
       word_to_num, class_to_num, min_length=10, full_length=10)
-    self.y_train = generate_labels_tensor(self.y_train, self.config.num_classes)
+    self.y_train = reddit_data.generate_onehot(self.y_train, self.config.num_classes)
+
+    self.X_val, self.y_val, self.lengths_val = reddit_data.load_dataset('data/babyVal',
+      word_to_num, class_to_num, min_length=10, full_length=10)
+    self.y_val = reddit_data.generate_onehot(self.y_val, self.config.num_classes)
 
     self.X_test, self.y_test, self.lengths_test = reddit_data.load_dataset('data/babyTest',
       word_to_num, class_to_num, min_length=10, full_length=10)
-    self.y_test = generate_labels_tensor(self.y_test, self.config.num_classes)
+    self.y_test = reddit_data.generate_onehot(self.y_test, self.config.num_classes)
 
   def add_placeholders(self):
     self.input_placeholder = tf.placeholder(tf.int32, [None, self.config.lstm_size])
@@ -96,7 +100,7 @@ class BaselineModel(LanguageModel):
     self.calculate_loss = self.add_loss_op(output)
     self.train_step = self.add_training_op(self.calculate_loss)
 
-  def run_epoch(self, session, input_data, input_labels, input_lengths, train_op=None):
+  def run_epoch(self, session, input_data, input_labels, input_lengths, train_op=None, verbose=True):
     orig_X, orig_y = input_data, input_labels
     dp = self.config.dropout
     if not train_op:
@@ -124,23 +128,15 @@ class BaselineModel(LanguageModel):
       total_correct_examples += total_correct
       total_loss.append(loss)
 
-    verbose = True
-    """
-    if verbose:#and step % verbose == 0:
-      sys.stdout.write('\r{} / {} : pp = {}'.format(total_steps, np.exp(np.mean(total_loss))))
+    if verbose: #and step % verbose == 0:
+      sys.stdout.write('\r{} / {} : pp = {}'.format(step, total_steps, np.exp(np.mean(total_loss))))
       sys.stdout.flush()
-    """
-
     if verbose:
       sys.stdout.write('\r')
+      sys.stdout.flush()
     loss = np.exp(np.mean(total_loss))
     acc = total_correct_examples / float(total_processed_examples)
     return loss, acc 
-
-def generate_labels_tensor(y, num_classes):
-  y_t = np.zeros((len(y), num_classes))
-  y_t[np.arange(len(y)), y] = 1
-  return y_t
 
 def test_baseline_model():
   c = Config()
@@ -156,11 +152,11 @@ def test_baseline_model():
       print 'Epoch {}'.format(epoch)
       #start = time.time()
       train_pp, train_acc = b.run_epoch(session, b.X_train, b.y_train, b.lengths_train, train_op=b.train_step)
-      test_pp, test_acc = b.run_epoch(session, b.X_test, b.y_test, b.lengths_test) # TODO: change validation to test later
+      val_pp, val_acc = b.run_epoch(session, b.X_val, b.y_val, b.lengths_val) # TODO: change validation to test later
       print 'Training perplexity: {}'.format(train_pp)
       print 'Training accuracy: {}'.format(train_acc)
-      print 'Testing perplexity: {}'.format(test_pp)
-      print 'Testing accuracy: {}'.format(test_acc)
+      print 'Validation perplexity: {}'.format(val_pp)
+      # print 'Testing accuracy: {}'.format(test_acc)
 
   print 'Reached the end of the test! Nothing broke.'
 
