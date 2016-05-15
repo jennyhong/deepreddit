@@ -33,18 +33,20 @@ class BaselineModel(LanguageModel):
     self.input_placeholder = tf.placeholder(tf.int32, [None, self.config.lstm_size])
     self.labels_placeholder = tf.placeholder(tf.int32, [None, self.config.lstm_size])
     self.dropout_placeholder = tf.placeholder(tf.float32)
+    self.early_stop_times = tf.placeholder(tf.int32, [self.config.batch_size]) #??
 
   def add_embedding(self):
     with tf.device('/cpu:0'), tf.variable_scope('embedding'):
       embeddings = tf.Variable(tf.convert_to_tensor(self.wv, dtype=tf.float32), name="Embedding")
       window = tf.nn.embedding_lookup(embeddings, self.input_placeholder)
-      inputs = [tf.squeeze(inpt) for inpt in tf.split(1, self.config.lstm_size, window)]
+      inputs = [tf.squeeze(inpt, squeeze_dims=[1]) for inpt in tf.split(1, self.config.lstm_size, window)]
       return inputs
 
   def add_rnn_model(self, inputs):
-    lstm = rnn_cell.BasicLSTMCell(self.config.lstm_size)
-    state = tf.zeros([self.config.batch_size, lstm.state_size])
-    return state
+    cell = rnn_cell.LSTMCell(self.config.hidden_size, self.wv_dim)  
+    initial_state = cell.zero_state(self.config.batch_size, tf.float32)
+    outputs, state = tf.nn.rnn(cell, inputs, initial_state=initial_state, sequence_length=self.early_stop_times)
+    return outputs
 
   def __init__(self, config):
     self.config = config
