@@ -15,9 +15,9 @@ class Config(object):
   # The number of time-steps we propagate forward
   # For now, it is a constant length
   lstm_size = 10
-  batch_size = 51
+  batch_size = 20
   learning_rate = 0.001
-  max_epochs = 1
+  max_epochs = 10
 
 class BaselineModel(LanguageModel):
 
@@ -32,12 +32,10 @@ class BaselineModel(LanguageModel):
     self.X_train, self.y_train, self.lengths_train = reddit_data.load_dataset('data/babyTrain',
       word_to_num, class_to_num, min_length=10, full_length=10)
     self.y_train = generate_labels_tensor(self.y_train, self.config.num_classes)
-    print self.X_train.shape, self.y_train.shape
 
     self.X_test, self.y_test, self.lengths_test = reddit_data.load_dataset('data/babyTest',
       word_to_num, class_to_num, min_length=10, full_length=10)
     self.y_test = generate_labels_tensor(self.y_test, self.config.num_classes)
-    print self.X_test.shape, self.y_test.shape
 
   def add_placeholders(self):
     self.input_placeholder = tf.placeholder(tf.int32, [None, self.config.lstm_size])
@@ -87,30 +85,44 @@ class BaselineModel(LanguageModel):
     # Use the last hidden state of the RNN to classify
     self.output = self.add_classifier_model(self.rnn_output)
     self.prediction = tf.nn.softmax(tf.cast(self.output, 'float64'))
+
+    # Calculate classification accuracy
+    one_hot_prediction = tf.argmax(self.prediction, 1)
+    correct_prediction = tf.equal(tf.argmax(self.labels_placeholder, 1), one_hot_prediction)
+    self.correct_predictions = tf.reduce_sum(tf.cast(correct_prediction, 'int32'))
+
     output = tf.reshape(tf.concat(1, self.output), [-1, self.config.num_classes])
     print 'outputs:', output.get_shape()
     self.calculate_loss = self.add_loss_op(output)
     self.train_step = self.add_training_op(self.calculate_loss)
 
-  def run_epoch(self, session, x, y, lengths, train_op=None):
+  def run_epoch(self, session, input_data, input_labels, input_lengths, train_op=None):
+    orig_X, orig_y = input_data, input_labels
+    dp = self.config.dropout
     if not train_op:
       train_op = tf.no_op()
       dp = 1
-    #total_steps = sum(1 for x in ptb_iterator(data, self.config.batch_size, self.config.lstm_size))
-    batch_len = len(x) // self.config.batch_size
-    total_steps = (batch_len - 1) // self.config.lstm_size
+    total_steps = sum(1 for x in reddit_data.data_iterator(input_data, input_lengths,
+                      input_labels, self.config.batch_size, self.config.num_classes))
+    batch_len = len(input_data) // self.config.batch_size
+    # total_steps = (batch_len - 1) // self.config.lstm_size
     total_loss = []
+    total_correct_examples = 0
+    total_processed_examples = 0
     state = self.initial_state.eval()
-    #for step, (x, y) in enumerate(ptb_iterator(data, self.config.batch_size, self.config.lstm_size)):
-    print x.shape, y.shape
-    
-    feed = {self.input_placeholder : x,
-      self.labels_placeholder : y,
-      self.initial_state : state,
-      self.dropout_placeholder : self.config.dropout,
-      self.early_stop_times : lengths} # TODO: get num_time_steps for each input in x
-    loss, state, _ = session.run([self.calculate_loss, self.final_state, train_op], feed_dict=feed)
-    total_loss.append(loss)
+    for step, (x, y, lengths) in enumerate(reddit_data.data_iterator(input_data, input_lengths,
+                      input_labels, self.config.batch_size, self.config.num_classes)):      
+      feed = {self.input_placeholder : x,
+        self.labels_placeholder : y,
+        self.initial_state : state,
+        self.dropout_placeholder : dp,
+        self.early_stop_times : lengths}
+      loss, state, total_correct, _ = session.run(
+            [self.calculate_loss, self.final_state, self.correct_predictions, train_op],
+            feed_dict=feed)
+      total_processed_examples += len(x)
+      total_correct_examples += total_correct
+      total_loss.append(loss)
 
     verbose = True
     """
@@ -121,23 +133,9 @@ class BaselineModel(LanguageModel):
 
     if verbose:
       sys.stdout.write('\r')
-    return np.exp(np.mean(total_loss))
-
-def ptb_iterator(raw_data, batch_size, num_steps):
-  # Pulled from https://github.com/tensorflow/tensorflow/blob/master/tensorflow/models/rnn/ptb/reader.py#L82
-  raw_data = np.array(raw_data, dtype=np.int32)
-  data_len = len(raw_data)
-  batch_len = data_len // batch_size
-  data = np.zeros([batch_size, batch_len], dtype=np.int32)
-  for i in range(batch_size):
-    data[i] = raw_data[batch_len * i:batch_len * (i + 1)]
-  epoch_size = (batch_len - 1) // num_steps
-  if epoch_size == 0:
-    raise ValueError("epoch_size == 0, decrease batch_size or num_steps")
-  for i in range(epoch_size):
-    x = data[:, i * num_steps:(i + 1) * num_steps]
-    y = data[:, i * num_steps + 1:(i + 1) * num_steps + 1]
-    yield (x, y)
+    loss = np.exp(np.mean(total_loss))
+    acc = total_correct_examples / float(total_processed_examples)
+    return loss, acc 
 
 def generate_labels_tensor(y, num_classes):
   y_t = np.zeros((len(y), num_classes))
@@ -157,10 +155,12 @@ def test_baseline_model():
     for epoch in xrange(c.max_epochs):
       print 'Epoch {}'.format(epoch)
       #start = time.time()
-      train_pp = b.run_epoch(session, b.X_train, b.y_train, b.lengths_train, train_op=b.train_step)
-      test_pp = b.run_epoch(session, b.X_test, b.y_test, b.lengths_test) # TODO: change validation to test later
+      train_pp, train_acc = b.run_epoch(session, b.X_train, b.y_train, b.lengths_train, train_op=b.train_step)
+      test_pp, test_acc = b.run_epoch(session, b.X_test, b.y_test, b.lengths_test) # TODO: change validation to test later
       print 'Training perplexity: {}'.format(train_pp)
+      print 'Training accuracy: {}'.format(train_acc)
       print 'Testing perplexity: {}'.format(test_pp)
+      print 'Testing accuracy: {}'.format(test_acc)
 
   print 'Reached the end of the test! Nothing broke.'
 

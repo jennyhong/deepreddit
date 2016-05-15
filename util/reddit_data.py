@@ -91,3 +91,28 @@ def load_dataset(filename, word_to_num, class_to_num,
       class_name = items[0]
       y.append(class_to_num[class_name])
   return np.array(X), np.array(y), np.array(lengths)
+
+def data_iterator(orig_X, orig_lengths, orig_y=None, batch_size=32, label_size=2, shuffle=False):
+  # Optionally shuffle the data before training
+  if shuffle:
+    indices = np.random.permutation(len(orig_X))
+    data_X = orig_X[indices]
+    data_lengths = orig_lengths[indices]
+    data_y = orig_y[indices] if np.any(orig_y) else None
+  else:
+    data_X = orig_X
+    data_lengths = orig_lengths
+    data_y = orig_y
+  ###
+  total_processed_examples = 0
+  total_steps = int(np.ceil(len(data_X) / float(batch_size)))
+  for step in xrange(total_steps):
+    # Create the batch by selecting up to batch_size elements
+    batch_start = step * batch_size
+    x = data_X[batch_start:batch_start + batch_size]
+    lengths = data_lengths[batch_start:batch_start + batch_size]
+    y = data_y[batch_start:batch_start + batch_size]
+    yield x, y, lengths
+    total_processed_examples += len(x)
+  # Sanity check to make sure we iterated over all the dataset as intended
+  assert total_processed_examples == len(data_X), 'Expected {} and processed {}'.format(len(data_X), total_processed_examples)
