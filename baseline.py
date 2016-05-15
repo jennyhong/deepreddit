@@ -2,7 +2,6 @@ import numpy as np
 import sys
 import tensorflow as tf
 from tensorflow.models.rnn import rnn, rnn_cell
-from tensorflow.python.ops.seq2seq import sequence_loss
 
 from config import Config
 from model import LanguageModel
