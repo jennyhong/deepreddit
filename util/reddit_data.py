@@ -40,24 +40,47 @@ def load_wv(data_dir='vocab/', glove_filename='glove.6B.50d.txt',
   return wv, word_to_num, num_to_word
 
 def load_dataset(filename, word_to_num, class_to_num,
-  min_sentence_length=10, full_sentence_length=10):
+  min_length=10, full_length=10):
+  """
+  min_length: All comments shorter than this number of words
+          are ignored entirely.
+
+  We use npoints to mean the number of comments in filename
+  longer than min_length. So we return
+
+  X: np.array of size (npoints, full_length)
+      Each sentence shorter than full_length is padded with the
+      token '<FILLER>' until it is full_length, so that X can be
+      a single matrix, rather than a list of length npoints.
+      Each row of x stores the indices of the words in the sentence.
+  y: np.array of size (npoints)
+      The indices of the classes of each data point.
+  lengths: np.array of size (npoints)
+      The original length of each sentence.
+  """
   X = list()
   y = list()
+  lengths = list()
   with open(filename, 'r') as f:
     for line in f.readlines():
       items = line.strip().split('\t')
-      
       # In Will's reddit dataset, all comments start with <EOS>
       # TODO: Make sure this generalizes if we need to use another dataset
       words = items[9].split()[1:]
       
-      if len(words) < min_sentence_length:
-        # TODO: Pad sentences longer than min_sentence_length to full_sentence_length
-        # For now, we'll just skip anything shorter than full_sentence_length
+      if len(words) < min_length:
         continue
-      # Add the data point to x
-      x = list()
-      for i in xrange(full_sentence_length):
+
+      if len(words) < full_length:
+        lengths.append(len(words))
+      else:
+        lengths.append(full_length)
+
+      while len(words) < full_length:
+        words.append('<FILLER>')
+      
+      x = list() # Add the data point to x
+      for i in xrange(full_length):
         word = words[i]
         if word not in word_to_num:
           word = '<UNK>'
@@ -67,4 +90,4 @@ def load_dataset(filename, word_to_num, class_to_num,
       # Add the data point to y
       class_name = items[0]
       y.append(class_to_num[class_name])
-  return np.array(X), np.array(y)
+  return np.array(X), np.array(y), np.array(lengths)

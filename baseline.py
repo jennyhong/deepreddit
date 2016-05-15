@@ -23,11 +23,11 @@ class BaselineModel(LanguageModel):
     self.num_to_class = dict(enumerate(self.class_names))
     class_to_num = {v:k for k,v in self.num_to_class.iteritems()}
 
-    self.X_train, self.y_train = reddit_data.load_dataset('data/babyTrain',
-      word_to_num, class_to_num, min_sentence_length=5, full_sentence_length=5)
+    self.X_train, self.y_train, self.lengths_train = reddit_data.load_dataset('data/babyTrain',
+      word_to_num, class_to_num, min_length=5, full_length=self.config.lstm_size)
 
-    self.X_test, self.y_test = reddit_data.load_dataset('data/babyTest',
-      word_to_num, class_to_num, min_sentence_length=5, full_sentence_length=5)
+    self.X_test, self.y_test, self.lengths_test = reddit_data.load_dataset('data/babyTest',
+      word_to_num, class_to_num, min_length=5, full_length=self.config.lstm_size)
 
   def add_placeholders(self):
     self.input_placeholder = tf.placeholder(tf.int32, [None, self.config.lstm_size])
