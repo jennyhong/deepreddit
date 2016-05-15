@@ -1,43 +1,32 @@
 import numpy as np
+import sys
 import tensorflow as tf
 from tensorflow.models.rnn import rnn, rnn_cell
 from tensorflow.python.ops.seq2seq import sequence_loss
 
-
+from config import Config
 from model import LanguageModel
 from util import reddit_data
-import sys
-
-class Config(object):
-  dropout = 0.9
-  # The number of hidden units in each LSTM cell
-  hidden_size = 7
-  # The number of time-steps we propagate forward
-  # For now, it is a constant length
-  lstm_size = 10
-  batch_size = 20
-  learning_rate = 0.001
-  max_epochs = 10
 
 class BaselineModel(LanguageModel):
 
   def load_data(self):
-    self.wv, word_to_num, num_to_word = reddit_data.load_wv()
+    self.wv, word_to_num, num_to_word = reddit_data.load_wv(data_dir=self.config.vocab_dir)
     self.num_vocab, self.wv_dim = self.wv.shape
     self.class_names = ['Jokes', 'communism']
     self.config.num_classes = len(self.class_names) #TODO: make modular lolololol
     self.num_to_class = dict(enumerate(self.class_names))
     class_to_num = {v:k for k,v in self.num_to_class.iteritems()}
 
-    self.X_train, self.y_train, self.lengths_train = reddit_data.load_dataset('data/babyTrain',
+    self.X_train, self.y_train, self.lengths_train = reddit_data.load_dataset(self.config.train_file,
       word_to_num, class_to_num, min_length=10, full_length=10)
     self.y_train = reddit_data.generate_onehot(self.y_train, self.config.num_classes)
 
-    self.X_val, self.y_val, self.lengths_val = reddit_data.load_dataset('data/babyVal',
+    self.X_val, self.y_val, self.lengths_val = reddit_data.load_dataset(self.config.val_file,
       word_to_num, class_to_num, min_length=10, full_length=10)
     self.y_val = reddit_data.generate_onehot(self.y_val, self.config.num_classes)
 
-    self.X_test, self.y_test, self.lengths_test = reddit_data.load_dataset('data/babyTest',
+    self.X_test, self.y_test, self.lengths_test = reddit_data.load_dataset(self.config.test_file,
       word_to_num, class_to_num, min_length=10, full_length=10)
     self.y_test = reddit_data.generate_onehot(self.y_test, self.config.num_classes)
 
