@@ -36,7 +36,7 @@ class BaselineModel(LanguageModel):
 
   def add_embedding(self):
     with tf.device('/cpu:0'), tf.variable_scope('embedding'):
-      embeddings = tf.get_variable("Embedding", (self.num_vocab, self.config.hidden_size))
+      embeddings = tf.Variable(tf.convert_to_tensor(self.wv, dtype=tf.float32), name="Embedding")
       window = tf.nn.embedding_lookup(embeddings, self.input_placeholder)
       inputs = [tf.squeeze(inpt) for inpt in tf.split(1, self.config.lstm_size, window)]
       return inputs
