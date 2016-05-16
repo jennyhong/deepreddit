@@ -12,7 +12,7 @@ class BaselineModel(LanguageModel):
   def load_data(self):
     self.wv, word_to_num, num_to_word = reddit_data.load_wv(data_dir=self.config.vocab_dir)
     self.num_vocab, self.wv_dim = self.wv.shape
-    self.class_names = ['Jokes', 'communism']
+    self.class_names = self.config.class_names
     self.config.num_classes = len(self.class_names) #TODO: make modular lolololol
     self.num_to_class = dict(enumerate(self.class_names))
     class_to_num = {v:k for k,v in self.num_to_class.iteritems()}
@@ -20,10 +20,20 @@ class BaselineModel(LanguageModel):
     self.X_train, self.y_train, self.lengths_train = reddit_data.load_dataset(self.config.train_file,
       word_to_num, class_to_num, min_length=10, full_length=10)
     self.y_train = reddit_data.generate_onehot(self.y_train, self.config.num_classes)
+    if self.config.debug:
+      n_sample = len(self.X_train) / 1024
+      if n_sample > 0:
+        self.X_train = self.X_train[::n_sample]
+        self.y_train = self.y_train[::n_sample]
 
     self.X_val, self.y_val, self.lengths_val = reddit_data.load_dataset(self.config.val_file,
       word_to_num, class_to_num, min_length=10, full_length=10)
     self.y_val = reddit_data.generate_onehot(self.y_val, self.config.num_classes)
+    if self.config.debug:
+      n_sample = len(self.X_val) / 1024
+      if n_sample > 0:
+        self.X_val = self.X_val[::n_sample]
+        self.y_val = self.y_val[::n_sample]
 
     self.X_test, self.y_test, self.lengths_test = reddit_data.load_dataset(self.config.test_file,
       word_to_num, class_to_num, min_length=10, full_length=10)
@@ -43,7 +53,7 @@ class BaselineModel(LanguageModel):
       return inputs
 
   def add_rnn_model(self, inputs):
-    cell = rnn_cell.BasicLSTMCell(self.config.hidden_size)  
+    cell = rnn_cell.BasicLSTMCell(self.config.hidden_size)
     #print inputs[0].get_shape()
     self.initial_state = cell.zero_state(self.config.batch_size, tf.float32)
     outputs, self.final_state = tf.nn.rnn(cell, inputs, initial_state=None, sequence_length=self.early_stop_times, dtype=tf.float32)
@@ -101,7 +111,7 @@ class BaselineModel(LanguageModel):
     total_processed_examples = 0
     state = self.initial_state.eval()
     for step, (x, y, lengths) in enumerate(reddit_data.data_iterator(input_data, input_lengths,
-                      input_labels, self.config.batch_size, self.config.num_classes)):      
+                      input_labels, self.config.batch_size, self.config.num_classes)):
       feed = {self.input_placeholder : x,
               self.labels_placeholder : y,
               self.initial_state : state,
@@ -122,7 +132,7 @@ class BaselineModel(LanguageModel):
       sys.stdout.flush()
     loss = np.exp(np.mean(total_loss))
     acc = total_correct_examples / float(total_processed_examples)
-    return loss, acc 
+    return loss, acc
 
 def test_baseline_model():
   c = Config()
