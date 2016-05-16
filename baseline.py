@@ -2,6 +2,7 @@ import numpy as np
 import sys
 import tensorflow as tf
 from tensorflow.models.rnn import rnn, rnn_cell
+import time
 
 from config import Config
 from model import LanguageModel
