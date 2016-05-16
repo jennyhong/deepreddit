@@ -88,16 +88,14 @@ class BaselineModel(LanguageModel):
     self.calculate_loss = self.add_loss_op(output)
     self.train_step = self.add_training_op(self.calculate_loss)
 
-  def run_epoch(self, session, input_data, input_labels, input_lengths, train_op=None, verbose=True):
+  def run_epoch(self, session, input_data, input_labels, input_lengths, train_op=None, verbose=10):
     orig_X, orig_y = input_data, input_labels
-    dp = self.config.dropout
+    dropout = self.config.dropout
     if not train_op:
       train_op = tf.no_op()
-      dp = 1
+      dropout = 1
     total_steps = sum(1 for x in reddit_data.data_iterator(input_data, input_lengths,
                       input_labels, self.config.batch_size, self.config.num_classes))
-    batch_len = len(input_data) // self.config.batch_size
-    # total_steps = (batch_len - 1) // self.config.lstm_size
     total_loss = []
     total_correct_examples = 0
     total_processed_examples = 0
@@ -105,18 +103,18 @@ class BaselineModel(LanguageModel):
     for step, (x, y, lengths) in enumerate(reddit_data.data_iterator(input_data, input_lengths,
                       input_labels, self.config.batch_size, self.config.num_classes)):      
       feed = {self.input_placeholder : x,
-        self.labels_placeholder : y,
-        self.initial_state : state,
-        self.dropout_placeholder : dp,
-        self.early_stop_times : lengths}
+              self.labels_placeholder : y,
+              self.initial_state : state,
+              self.dropout_placeholder : dropout,
+              self.early_stop_times : lengths}
       loss, state, total_correct, _ = session.run(
-            [self.calculate_loss, self.final_state, self.correct_predictions, train_op],
-            feed_dict=feed)
+              [self.calculate_loss, self.final_state, self.correct_predictions, train_op],
+              feed_dict=feed)
       total_processed_examples += len(x)
       total_correct_examples += total_correct
       total_loss.append(loss)
 
-    if verbose: #and step % verbose == 0:
+    if verbose and step % verbose == 0:
       sys.stdout.write('\r{} / {} : pp = {}'.format(step, total_steps, np.exp(np.mean(total_loss))))
       sys.stdout.flush()
     if verbose:
@@ -138,13 +136,25 @@ def test_baseline_model():
     session.run(init)
     for epoch in xrange(c.max_epochs):
       print 'Epoch {}'.format(epoch)
-      #start = time.time()
+      start = time.time()
+
       train_pp, train_acc = b.run_epoch(session, b.X_train, b.y_train, b.lengths_train, train_op=b.train_step)
       val_pp, val_acc = b.run_epoch(session, b.X_val, b.y_val, b.lengths_val) # TODO: change validation to test later
       print 'Training perplexity: {}'.format(train_pp)
       print 'Training accuracy: {}'.format(train_acc)
       print 'Validation perplexity: {}'.format(val_pp)
-      # print 'Testing accuracy: {}'.format(test_acc)
+      print 'Validation accuracy: {}'.format(val_acc)
+
+      if val_pp < best_val_pp:
+        best_val_pp = val_pp
+        best_val_epoch = epoch
+      print 'Total time: {}'.format(time.time() - start)
+
+    test_pp, test_acc = b.run_epoch(session, b.X_test, b.y_test, b.lengths_test)
+    print '=-=' * 5
+    print 'Test perplexity: {}'.format(test_pp)
+    print 'Test accuracy: {}'.format(test_acc)
+    print '=-=' * 5
 
   print 'Reached the end of the test! Nothing broke.'
 
