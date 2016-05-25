@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import sys
 import tensorflow as tf
 from tensorflow.models.rnn import rnn, rnn_cell
@@ -63,8 +64,9 @@ class BaselineModel(LanguageModel):
 
   def add_classifier_model(self, rnn_output):
     print 'rnn_output has shape', rnn_output.get_shape()
-    U = tf.get_variable("U", (self.config.hidden_size * 2, self.config.num_classes))
-    b = tf.get_variable("b", (self.config.num_classes))
+    with tf.variable_scope('classifier') as scope:
+      U = tf.get_variable("U", (self.config.hidden_size * 2, self.config.num_classes))
+      b = tf.get_variable("b", (self.config.num_classes))
     output = tf.matmul(rnn_output, U) + b
     print 'classifier_output has shape', output.get_shape()
     return output
@@ -72,6 +74,9 @@ class BaselineModel(LanguageModel):
   def add_loss_op(self, classifier_output):
     print classifier_output.get_shape(), self.labels_placeholder.get_shape()
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(classifier_output, self.labels_placeholder))
+    with tf.variable_scope('classifier', reuse=True) as scope:
+      U = tf.get_variable("U")
+    loss += self.config.l2_reg * tf.nn.l2_loss(U)
     return loss
 
   def add_training_op(self, loss):
@@ -99,7 +104,8 @@ class BaselineModel(LanguageModel):
     self.calculate_loss = self.add_loss_op(output)
     self.train_step = self.add_training_op(self.calculate_loss)
 
-  def run_epoch(self, session, input_data, input_labels, input_lengths, train_op=None, verbose=10):
+  def run_epoch(self, session, input_data, input_labels, input_lengths,
+    train_op=None, verbose=10, new_model=False):
     orig_X, orig_y = input_data, input_labels
     dropout = self.config.dropout
     if not train_op:
@@ -135,22 +141,23 @@ class BaselineModel(LanguageModel):
     acc = total_correct_examples / float(total_processed_examples)
     return loss, acc
 
-def test_baseline_model():
-  c = Config()
-  b = BaselineModel(c)
+def train_baseline_model(model):
   init = tf.initialize_all_variables()
+  saver = tf.train.Saver()
 
   with tf.Session() as session:
     best_val_pp = float('inf')
     best_val_epoch = 0
 
     session.run(init)
-    for epoch in xrange(c.max_epochs):
+    for epoch in xrange(model.config.max_epochs):
       print 'Epoch {}'.format(epoch)
       start = time.time()
 
-      train_pp, train_acc = b.run_epoch(session, b.X_train, b.y_train, b.lengths_train, train_op=b.train_step)
-      val_pp, val_acc = b.run_epoch(session, b.X_val, b.y_val, b.lengths_val) # TODO: change validation to test later
+      train_pp, train_acc = model.run_epoch(session,
+        model.X_train, model.y_train, model.lengths_train, train_op=model.train_step)
+      val_pp, val_acc = model.run_epoch(session,
+        model.X_val, model.y_val, model.lengths_val)
       print 'Training perplexity: {}'.format(train_pp)
       print 'Training accuracy: {}'.format(train_acc)
       print 'Validation perplexity: {}'.format(val_pp)
@@ -159,9 +166,18 @@ def test_baseline_model():
       if val_pp < best_val_pp:
         best_val_pp = val_pp
         best_val_epoch = epoch
+        if not os.path.exists("./weights"):
+          os.makedirs("./weights")
+        saver.save(session, './weights/baseline.weights')
+
       print 'Total time: {}'.format(time.time() - start)
 
-    test_pp, test_acc = b.run_epoch(session, b.X_test, b.y_test, b.lengths_test)
+def test_baseline_model(model, session_filename='./weights/baseline.weights'):
+  saver = tf.train.Saver()
+  with tf.Session() as session:
+    saver.restore(session, session_filename)
+    test_pp, test_acc = model.run_epoch(session,
+      model.X_test, model.y_test, model.lengths_test)
     print '=-=' * 5
     print 'Test perplexity: {}'.format(test_pp)
     print 'Test accuracy: {}'.format(test_acc)
@@ -169,5 +185,11 @@ def test_baseline_model():
 
   print 'Reached the end of the test! Nothing broke.'
 
+def main():
+  c = Config()
+  b = BaselineModel(c)
+  train_baseline_model(b)
+  test_baseline_model(b)
+
 if '__main__' == __name__:
-  test_baseline_model()
+  main()

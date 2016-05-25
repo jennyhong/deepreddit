@@ -10,6 +10,7 @@ class Config(object):
   lstm_size = 10
   learning_rate = 0.001
   max_epochs = 10
+  l2_reg = 0.1
 
   vocab_dir = '../../dfs-leon/rc/vocab/'
   train_file = '../../dfs-leon/rc/data/train31class.small'
