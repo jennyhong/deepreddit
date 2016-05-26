@@ -168,14 +168,14 @@ def train_baseline_model(model):
         best_val_epoch = epoch
         if not os.path.exists(model.config.weights_dir):
           os.makedirs(model.config.weights_dir)
-        saver.save(session, model.config.weights_file)
+        saver.save(session, model.config.weights_file())
 
       print 'Total time: {}'.format(time.time() - start)
 
 def test_baseline_model(model):
   saver = tf.train.Saver()
   with tf.Session() as session:
-    saver.restore(session, model.config.weights_file)
+    saver.restore(session, model.config.weights_file())
     test_pp, test_acc = model.run_epoch(session,
       model.X_test, model.y_test, model.lengths_test)
     print '=-=' * 5
