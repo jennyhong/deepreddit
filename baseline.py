@@ -166,16 +166,16 @@ def train_baseline_model(model):
       if val_pp < best_val_pp:
         best_val_pp = val_pp
         best_val_epoch = epoch
-        if not os.path.exists("./weights"):
-          os.makedirs("./weights")
-        saver.save(session, './weights/baseline.weights')
+        if not os.path.exists(self.config.weights_dir):
+          os.makedirs(self.config.weights_dir)
+        saver.save(session, self.config.weights_file)
 
       print 'Total time: {}'.format(time.time() - start)
 
-def test_baseline_model(model, session_filename='./weights/baseline.weights'):
+def test_baseline_model(model):
   saver = tf.train.Saver()
   with tf.Session() as session:
-    saver.restore(session, session_filename)
+    saver.restore(session, self.config.weights_file)
     test_pp, test_acc = model.run_epoch(session,
       model.X_test, model.y_test, model.lengths_test)
     print '=-=' * 5
@@ -186,10 +186,11 @@ def test_baseline_model(model, session_filename='./weights/baseline.weights'):
   print 'Reached the end of the test! Nothing broke.'
 
 def main():
-  c = Config()
-  b = BaselineModel(c)
-  train_baseline_model(b)
-  test_baseline_model(b)
+  config = Config()
+  baselineModel = BaselineModel(config)
+  train_baseline_model(baselineModel)
+  test_baseline_model(baselineModel)
+  print config
 
 if '__main__' == __name__:
   main()
