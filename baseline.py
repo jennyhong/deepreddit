@@ -20,7 +20,7 @@ class BaselineModel(LanguageModel):
     class_to_num = {v:k for k,v in self.num_to_class.iteritems()}
 
     self.X_train, self.y_train, self.lengths_train = reddit_data.load_dataset(self.config.train_file,
-      word_to_num, class_to_num, min_length=10, full_length=10)
+      word_to_num, class_to_num, min_length=10, full_length=self.config.lstm_size)
     self.y_train = reddit_data.generate_onehot(self.y_train, self.config.num_classes)
     if self.config.debug:
       n_sample = len(self.X_train) / 1024
@@ -29,7 +29,7 @@ class BaselineModel(LanguageModel):
         self.y_train = self.y_train[::n_sample]
 
     self.X_val, self.y_val, self.lengths_val = reddit_data.load_dataset(self.config.val_file,
-      word_to_num, class_to_num, min_length=10, full_length=10)
+      word_to_num, class_to_num, min_length=10, full_length=self.config.lstm_size)
     self.y_val = reddit_data.generate_onehot(self.y_val, self.config.num_classes)
     if self.config.debug:
       n_sample = len(self.X_val) / 1024
@@ -38,7 +38,7 @@ class BaselineModel(LanguageModel):
         self.y_val = self.y_val[::n_sample]
 
     self.X_test, self.y_test, self.lengths_test = reddit_data.load_dataset(self.config.test_file,
-      word_to_num, class_to_num, min_length=10, full_length=10)
+      word_to_num, class_to_num, min_length=10, full_length=self.config.lstm_size)
     self.y_test = reddit_data.generate_onehot(self.y_test, self.config.num_classes)
 
   def add_placeholders(self):
@@ -139,7 +139,7 @@ class BaselineModel(LanguageModel):
       sys.stdout.flush()
     loss = np.exp(np.mean(total_loss))
     acc = total_correct_examples / float(total_processed_examples)
-    return loss, acc
+    return loss, acc, total_loss
 
 def train_baseline_model(model):
   init = tf.initialize_all_variables()
@@ -149,19 +149,29 @@ def train_baseline_model(model):
     best_val_pp = float('inf')
     best_val_epoch = 0
 
+    # for lr annealing
+    prev_epoch_loss = float('inf')
+
     session.run(init)
     for epoch in xrange(model.config.max_epochs):
       print 'Epoch {}'.format(epoch)
       start = time.time()
 
-      train_pp, train_acc = model.run_epoch(session,
+      train_pp, train_acc, loss_history = model.run_epoch(session,
         model.X_train, model.y_train, model.lengths_train, train_op=model.train_step)
-      val_pp, val_acc = model.run_epoch(session,
+      val_pp, val_acc, _ = model.run_epoch(session,
         model.X_val, model.y_val, model.lengths_val)
       print 'Training perplexity: {}'.format(train_pp)
       print 'Training accuracy: {}'.format(train_acc)
       print 'Validation perplexity: {}'.format(val_pp)
       print 'Validation accuracy: {}'.format(val_acc)
+
+      # lr annealing
+      epoch_loss = np.mean(loss_history)
+      if epoch_loss > prev_epoch_loss * model.config.anneal_threshold:
+        model.config.learning_rate /= model.config.anneal_by
+        print 'annealed learning rate to %f' % model.config.learning_rate
+      prev_epoch_loss = epoch_loss
 
       if val_pp < best_val_pp:
         best_val_pp = val_pp
@@ -176,7 +186,7 @@ def test_baseline_model(model):
   saver = tf.train.Saver()
   with tf.Session() as session:
     saver.restore(session, model.config.weights_file())
-    test_pp, test_acc = model.run_epoch(session,
+    test_pp, test_acc, loss_history = model.run_epoch(session,
       model.X_test, model.y_test, model.lengths_test)
     print '=-=' * 5
     print 'Test perplexity: {}'.format(test_pp)

@@ -12,6 +12,8 @@ class Config(object):
   learning_rate = 0.001
   max_epochs = 2
   l2_reg = 0.1
+  anneal_by = 1.2
+  anneal_threshold = 0.99
 
   vocab_dir = 'vocab/'
   data_dir = 'data/'
@@ -34,5 +36,6 @@ class Config(object):
         'LSTM size ' + str(self.lstm_size),
         'Learning rate ' + str(self.learning_rate),
         'L2 Reg ' + str(self.l2_reg),
+        'Annealing ' + str(self.anneal_by),
         'Training dataset ' + self.train_file
       ])
