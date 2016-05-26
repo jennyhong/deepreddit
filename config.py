@@ -19,8 +19,8 @@ class Config(object):
   test_file = data_dir + 'test31class.med'
 
   weights_dir = data_dir + 'weights/'
-  weights_filename = model_name = 'hidden=%d_l2=%f_lr=%f.weights'%(embed_size, l2, lr)
-  weights_file + weights_dir + weights_filename
+  weights_filename = model_name = 'hidden=%d_l2=%f_lr=%f.weights'%(hidden_size, l2_reg, learning_rate)
+  weights_file = weights_dir + weights_filename
 
   def __str__(self):
     return '\n'.join([
