@@ -11,35 +11,15 @@ from util import reddit_data
 
 class BaselineModel(LanguageModel):
 
-  def load_data(self):
-    self.wv, word_to_num, num_to_word = reddit_data.load_wv(data_dir=self.config.vocab_dir)
-    self.num_vocab, self.wv_dim = self.wv.shape
-    self.class_names = self.config.class_names
-    self.config.num_classes = len(self.class_names) #TODO: make modular lolololol
-    self.num_to_class = dict(enumerate(self.class_names))
-    class_to_num = {v:k for k,v in self.num_to_class.iteritems()}
+  def load_data(self, dataLoader):
+    self.wv = dataLoader.wv
+    self.num_vocab, self.wv_dim = dataLoader.num_vocab, dataLoader.wv_dim
+    self.class_names = dataLoader.class_names
+    self.config.num_classes = dataLoader.config.num_classes
 
-    self.X_train, self.y_train, self.lengths_train = reddit_data.load_dataset(self.config.train_file,
-      word_to_num, class_to_num, min_length=10, full_length=self.config.lstm_size)
-    self.y_train = reddit_data.generate_onehot(self.y_train, self.config.num_classes)
-    if self.config.debug:
-      n_sample = len(self.X_train) / 1024
-      if n_sample > 0:
-        self.X_train = self.X_train[::n_sample]
-        self.y_train = self.y_train[::n_sample]
-
-    self.X_val, self.y_val, self.lengths_val = reddit_data.load_dataset(self.config.val_file,
-      word_to_num, class_to_num, min_length=10, full_length=self.config.lstm_size)
-    self.y_val = reddit_data.generate_onehot(self.y_val, self.config.num_classes)
-    if self.config.debug:
-      n_sample = len(self.X_val) / 1024
-      if n_sample > 0:
-        self.X_val = self.X_val[::n_sample]
-        self.y_val = self.y_val[::n_sample]
-
-    self.X_test, self.y_test, self.lengths_test = reddit_data.load_dataset(self.config.test_file,
-      word_to_num, class_to_num, min_length=10, full_length=self.config.lstm_size)
-    self.y_test = reddit_data.generate_onehot(self.y_test, self.config.num_classes)
+    self.X_train, self.y_train, self.lengths_train = dataLoader.X_train, dataLoader.y_train, dataLoader.lengths_train
+    self.X_val, self.y_val, self.lengths_val = dataLoader.X_val, dataLoader.y_val, dataLoader.lengths_val
+    self.X_test, self.y_test, self.lengths_test = dataLoader.X_test, dataLoader.y_test, dataLoader.lengths_test
 
   def add_placeholders(self):
     self.input_placeholder = tf.placeholder(tf.int32, [None, self.config.lstm_size])
@@ -84,9 +64,9 @@ class BaselineModel(LanguageModel):
     train_op = opt.minimize(loss)
     return train_op
 
-  def __init__(self, config):
+  def __init__(self, config, dataLoader):
     self.config = config
-    self.load_data()
+    self.load_data(dataLoader)
     self.add_placeholders()
     self.inputs = self.add_embedding()
     self.rnn_output = self.add_rnn_model(self.inputs)
@@ -181,6 +161,7 @@ def train_baseline_model(model):
         saver.save(session, model.config.weights_file())
 
       print 'Total time: {}'.format(time.time() - start)
+  return best_val_pp
 
 def test_baseline_model(model):
   saver = tf.train.Saver()
@@ -192,15 +173,18 @@ def test_baseline_model(model):
     print 'Test perplexity: {}'.format(test_pp)
     print 'Test accuracy: {}'.format(test_acc)
     print '=-=' * 5
-
-  print 'Reached the end of the test! Nothing broke.'
+  return test_pp, test_acc
 
 def main():
   config = Config()
-  baselineModel = BaselineModel(config)
-  train_baseline_model(baselineModel)
+  dataLoader = reddit_data.DataLoader(config)
+  baselineModel = BaselineModel(config, dataLoader)
+  best_val_pp = train_baseline_model(baselineModel)
   test_baseline_model(baselineModel)
   print config
+  print best_val_pp
+
+  print 'Reached the end of the test! Nothing broke.'
 
 if '__main__' == __name__:
   main()

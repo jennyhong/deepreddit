@@ -8,7 +8,7 @@ class Config(object):
   hidden_size = 20
   # The number of time-steps we propagate forward
   # For now, it is a constant length
-  lstm_size = 10
+  lstm_size = 20
   learning_rate = 0.001
   max_epochs = 2
   l2_reg = 0.1
@@ -24,8 +24,8 @@ class Config(object):
   weights_dir = data_dir + 'weights/'
 
   def weights_file(self):
-    weights_filename = 'hidden=%d_l2=%f_lr=%f.weights' % (self.hidden_size,
-      self.l2_reg, self.learning_rate)
+    weights_filename = 'hidden=%d_l2=%f_lr=%f_anneal=%f.weights' % (self.hidden_size,
+      self.l2_reg, self.learning_rate, self.anneal_by)
     return self.weights_dir + weights_filename
 
   def __str__(self):
