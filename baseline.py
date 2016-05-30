@@ -126,7 +126,7 @@ def train_baseline_model(model):
   saver = tf.train.Saver()
 
   with tf.Session() as session:
-    best_val_pp = float('inf')
+    best_val_acc = 0
     best_val_epoch = 0
 
     # for lr annealing
@@ -153,15 +153,15 @@ def train_baseline_model(model):
         print 'annealed learning rate to %f' % model.config.learning_rate
       prev_epoch_loss = epoch_loss
 
-      if val_pp < best_val_pp:
-        best_val_pp = val_pp
+      if val_acc > best_val_acc:
+        best_val_acc = val_acc
         best_val_epoch = epoch
         if not os.path.exists(model.config.weights_dir):
           os.makedirs(model.config.weights_dir)
         saver.save(session, model.config.weights_file())
 
       print 'Total time: {}'.format(time.time() - start)
-  return best_val_pp
+  return best_val_acc
 
 def test_baseline_model(model):
   saver = tf.train.Saver()
