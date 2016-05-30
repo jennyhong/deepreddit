@@ -60,12 +60,13 @@ class BaselineModel(LanguageModel):
     return loss
 
   def add_training_op(self, loss):
-    opt = tf.train.AdamOptimizer(learning_rate=self.config.learning_rate)
+    opt = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
     train_op = opt.minimize(loss)
     return train_op
 
   def __init__(self, config, dataLoader):
     self.config = config
+    self.learning_rate = self.config.learning_rate
     self.load_data(dataLoader)
     self.add_placeholders()
     self.inputs = self.add_embedding()
@@ -149,8 +150,8 @@ def train_baseline_model(model):
       # lr annealing
       epoch_loss = np.mean(loss_history)
       if epoch_loss > prev_epoch_loss * model.config.anneal_threshold:
-        model.config.learning_rate /= model.config.anneal_by
-        print 'annealed learning rate to %f' % model.config.learning_rate
+        model.learning_rate /= model.config.anneal_by
+        print 'annealed learning rate to %f' % model.learning_rate
       prev_epoch_loss = epoch_loss
 
       if val_acc > best_val_acc:
