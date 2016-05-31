@@ -31,6 +31,8 @@ def main():
     config.l2_reg = args.l2reg
   if args.lstmsize:
     config.lstm_size = args.lstmsize
+  if args.epochs:
+    config.max_epochs = args.epochs
   with tf.Graph().as_default():
     baselineModel = BaselineModel(config, dataLoader)
     best_val_acc = train_baseline_model(baselineModel)
