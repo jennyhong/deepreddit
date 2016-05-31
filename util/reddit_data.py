@@ -1,5 +1,5 @@
+import collections
 import numpy as np
-
 import vocab
 
 def generate_onehot(y, num_classes):
@@ -95,6 +95,16 @@ class DataLoader:
         class_name = items[0]
         y.append(class_to_num[class_name])
     return np.array(X), np.array(y), np.array(lengths)
+
+  def load_data_text(self, filename):
+    X = []
+    with open(filename, 'r') as f:
+      items = line.strip().split('\t')
+      words = items[9].split()[1:]
+      X.append(collections.Counter(words))
+    return X
+
+
 
 def data_iterator(orig_X, orig_lengths, orig_y=None, batch_size=32, label_size=2, shuffle=False):
   # Optionally shuffle the data before training
