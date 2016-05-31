@@ -33,6 +33,12 @@ def load_wv(data_dir='vocab/', glove_filename='glove.6B.50d.txt',
     reader = csv.reader(f, delimiter=' ', quoting=csv.QUOTE_NONE)
     for line in reader:
       glove_dict[line[0]] = np.array(list(map(float, line[1: ])))
-
+  
   word_to_num, num_to_word = get_word_indices(data_dir, vocab_filename)
+  wvs = list()
+  for word in word_to_num:
+    vector = glove_dict.get(word.strip(), randvec(d))
+    wvs.append(vector)
+  wv = np.array(wvs)
+
   return wv, word_to_num, num_to_word
