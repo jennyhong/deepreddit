@@ -12,8 +12,8 @@ def parse_args():
   parser.add_argument("--lr", type=float, help="learning rate")
   parser.add_argument("--annealby", type=float, help="annealing")
   parser.add_argument("--l2reg", type=float, help="L2 regularization")
-  parser.add_argument("--lstmsize", type=float, help="LSTM size: max number of words for one data point")
-  parser.add_argument("--epochs", type=float, help="Max number of epochs to train for")
+  parser.add_argument("--lstmsize", type=int, help="LSTM size: max number of words for one data point")
+  parser.add_argument("--epochs", type=int, help="Max number of epochs to train for")
   args = parser.parse_args()
   return args
 
