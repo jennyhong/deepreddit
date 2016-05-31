@@ -12,6 +12,8 @@ def parse_args():
   parser.add_argument("--lr", type=float, help="learning rate")
   parser.add_argument("--annealby", type=float, help="annealing")
   parser.add_argument("--l2reg", type=float, help="L2 regularization")
+  parser.add_argument("--lstmsize", type=float, help="LSTM size: max number of words for one data point")
+  parser.add_argument("--epochs", type=float, help="Max number of epochs to train for")
   args = parser.parse_args()
   return args
 
@@ -19,18 +21,25 @@ def main():
   args = parse_args()
   config = Config()
   dataLoader = reddit_data.DataLoader(config)
-  config.hidden_size = args.hiddensize
-  config.learning_rate = args.lr
-  config.anneal_by = args.annealby
-  config.l2_reg = args.l2reg
+  if args.hiddensize:
+    config.hidden_size = args.hiddensize
+  if args.lr:
+    config.learning_rate = args.lr
+  if args.annealby:
+    config.anneal_by = args.annealby
+  if args.l2reg:
+    config.l2_reg = args.l2reg
+  if args.lstmsize:
+    config.lstm_size = args.lstmsize
   with tf.Graph().as_default():
     baselineModel = BaselineModel(config, dataLoader)
     best_val_acc = train_baseline_model(baselineModel)
     if not os.path.exists('accuracies'):
       os.makedirs('accuracies')
     filename = 'accuracies/' + \
-      'hidden=%d_l2=%f_lr=%f_anneal=%f.acc' % (config.hidden_size,
-      config.l2_reg, config.learning_rate, config.anneal_by)
+      'hidden=%d_l2=%f_lr=%f_anneal=%f_lstmsize=%d_epochs=%d.acc' % (config.hidden_size,
+      config.l2_reg, config.learning_rate, config.anneal_by,
+      config.lstm_size, config.max_epochs)
     with open(filename, 'a+') as f:
       f.write(str(config) + '\n')
       f.write('Best validation accuracy: ' + str(best_val_acc) + '\n')
