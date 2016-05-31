@@ -1,17 +1,22 @@
 import collections
 import numpy as np
 import lda
+
+from config import Config
 from util import vocab
 
-num_topics = 2
+config = Config()
+
+num_topics = len(config.class_names)
 num_iters = 1000
 num_top_words = 15
 
-word_to_num, num_to_word = vocab.get_word_indices('vocab/', 'redditVocabBase.txt')
+
+word_to_num, num_to_word = vocab.get_word_indices(config.vocab_dir, 'redditVocabBase.txt')
 num_to_word = np.array([num_to_word[i] for i in xrange(len(word_to_num))])
 
 X = np.zeros((0, len(word_to_num)))
-with open('data/babyTrain') as train_file:
+with open(config.train_file) as train_file:
 	for line in train_file:
 		items = line.strip().split('\t')
 		words = items[9].split()[1:]
@@ -27,6 +32,7 @@ X = X.astype(int)
 model = lda.LDA(n_topics=num_topics, n_iter=num_iters, random_state=1)
 model.fit(X)
 
-for i, words in enumerate(model.topic_word_):
-	topic_words = num_to_word[np.argsort(words)][:-(num_top_words+1):-1]
-	print('Topic {}: {}'.format(i, ' '.join(topic_words)))
+with open('lda_output.txt', 'a+') as f:
+  for i, words in enumerate(model.topic_word_):
+    topic_words = num_to_word[np.argsort(words)][:-(num_top_words+1):-1]
+    f.write('Topic {}: {}\n'.format(i, ' '.join(topic_words)))
