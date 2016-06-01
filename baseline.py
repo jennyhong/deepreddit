@@ -71,7 +71,7 @@ class BaselineModel(LanguageModel):
     self.add_placeholders()
     self.inputs = self.add_embedding()
     self.rnn_output = self.add_rnn_model(self.inputs)
-    # Use the last hidden state of the RNN to classify
+    # Use the last output of the RNN to classify
     self.output = self.add_classifier_model(self.rnn_output)
     self.prediction = tf.nn.softmax(tf.cast(self.output, 'float64'))
 
@@ -105,8 +105,8 @@ class BaselineModel(LanguageModel):
               self.initial_state : state,
               self.dropout_placeholder : dropout,
               self.early_stop_times : lengths}
-      loss, state, total_correct, _ = session.run(
-              [self.calculate_loss, self.final_state, self.correct_predictions, train_op],
+      loss, state, total_correct, predictions = session.run(
+              [self.calculate_loss, self.final_state, self.correct_predictions, self.one_hot_prediction],
               feed_dict=feed)
       total_processed_examples += len(x)
       total_correct_examples += total_correct
@@ -120,7 +120,7 @@ class BaselineModel(LanguageModel):
       sys.stdout.flush()
     loss = np.exp(np.mean(total_loss))
     acc = total_correct_examples / float(total_processed_examples)
-    return loss, acc, total_loss
+    return loss, acc, total_loss, state, predictions
 
 def train_baseline_model(model):
   init = tf.initialize_all_variables()
@@ -138,9 +138,9 @@ def train_baseline_model(model):
       print 'Epoch {}'.format(epoch)
       start = time.time()
 
-      train_pp, train_acc, loss_history = model.run_epoch(session,
+      train_pp, train_acc, loss_history, _, _ = model.run_epoch(session,
         model.X_train, model.y_train, model.lengths_train, train_op=model.train_step)
-      val_pp, val_acc, _ = model.run_epoch(session,
+      val_pp, val_acc, _, _, _ = model.run_epoch(session,
         model.X_val, model.y_val, model.lengths_val)
       print 'Training perplexity: {}'.format(train_pp)
       print 'Training accuracy: {}'.format(train_acc)
@@ -168,13 +168,7 @@ def test_baseline_model(model):
   saver = tf.train.Saver()
   with tf.Session() as session:
     saver.restore(session, model.config.weights_file())
-    test_pp, test_acc, loss_history = model.run_epoch(session,
-      model.X_test, model.y_test, model.lengths_test)
-    print '=-=' * 5
-    print 'Test perplexity: {}'.format(test_pp)
-    print 'Test accuracy: {}'.format(test_acc)
-    print '=-=' * 5
-  return test_pp, test_acc
+    return model.run_epoch(session, model.X_test, model.y_test, model.lengths_test)
 
 def main():
   config = Config()
