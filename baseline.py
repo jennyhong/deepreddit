@@ -76,8 +76,8 @@ class BaselineModel(LanguageModel):
     self.prediction = tf.nn.softmax(tf.cast(self.output, 'float64'))
 
     # Calculate classification accuracy
-    one_hot_prediction = tf.argmax(self.prediction, 1)
-    correct_prediction = tf.equal(tf.argmax(self.labels_placeholder, 1), one_hot_prediction)
+    self.one_hot_prediction = tf.argmax(self.prediction, 1)
+    correct_prediction = tf.equal(tf.argmax(self.labels_placeholder, 1), self.one_hot_prediction)
     self.correct_predictions = tf.reduce_sum(tf.cast(correct_prediction, 'int32'))
 
     output = tf.reshape(tf.concat(1, self.output), [-1, self.config.num_classes])
@@ -105,8 +105,8 @@ class BaselineModel(LanguageModel):
               self.initial_state : state,
               self.dropout_placeholder : dropout,
               self.early_stop_times : lengths}
-      loss, state, total_correct, predictions = session.run(
-              [self.calculate_loss, self.final_state, self.correct_predictions, self.one_hot_prediction],
+      loss, state, total_correct = session.run(
+              [self.calculate_loss, self.final_state, self.correct_predictions],
               feed_dict=feed)
       total_processed_examples += len(x)
       total_correct_examples += total_correct
@@ -120,7 +120,20 @@ class BaselineModel(LanguageModel):
       sys.stdout.flush()
     loss = np.exp(np.mean(total_loss))
     acc = total_correct_examples / float(total_processed_examples)
-    return loss, acc, total_loss, state, predictions
+    return loss, acc, total_loss, state
+
+  def predict(self, session, X, labels, lengths):
+    state = self.initial_state.eval()
+    feed = {self.input_placeholder : X,
+            self.labels_placeholder : labels,
+            self.initial_state : state,
+            self.dropout_placeholder : 1.0,
+            self.early_stop_times : lengths}
+    loss, state, predictions, total_correct = session.run(
+              [self.calculate_loss, self.final_state, self.one_hot_prediction, self.correct_predictions],
+              feed_dict=feed)
+    acc = total_correct / float(len(labels))
+    return loss, acc, state, predictions
 
 def train_baseline_model(model):
   init = tf.initialize_all_variables()
@@ -138,9 +151,9 @@ def train_baseline_model(model):
       print 'Epoch {}'.format(epoch)
       start = time.time()
 
-      train_pp, train_acc, loss_history, _, _ = model.run_epoch(session,
+      train_pp, train_acc, loss_history, _ = model.run_epoch(session,
         model.X_train, model.y_train, model.lengths_train, train_op=model.train_step)
-      val_pp, val_acc, _, _, _ = model.run_epoch(session,
+      val_pp, val_acc, _, _ = model.run_epoch(session,
         model.X_val, model.y_val, model.lengths_val)
       print 'Training perplexity: {}'.format(train_pp)
       print 'Training accuracy: {}'.format(train_acc)
@@ -168,14 +181,15 @@ def test_baseline_model(model):
   saver = tf.train.Saver()
   with tf.Session() as session:
     saver.restore(session, model.config.weights_file())
-    return model.run_epoch(session, model.X_test, model.y_test, model.lengths_test)
+    return model.predict(session, model.X_test, model.y_test, model.lengths_test)
 
 def main():
   config = Config()
   dataLoader = reddit_data.DataLoader(config)
   baselineModel = BaselineModel(config, dataLoader)
   best_val_pp = train_baseline_model(baselineModel)
-  test_baseline_model(baselineModel)
+  test_pp, test_acc, state, predictions = test_baseline_model(baselineModel)
+  print predictions
   print config
   print best_val_pp
 
