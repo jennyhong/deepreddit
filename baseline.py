@@ -13,6 +13,7 @@ class BaselineModel(LanguageModel):
 
   def load_data(self, dataLoader):
     self.wv = dataLoader.wv
+    self.num_to_word = dataLoader.num_to_word
     self.num_vocab, self.wv_dim = dataLoader.num_vocab, dataLoader.wv_dim
     self.class_names = dataLoader.class_names
     self.config.num_classes = dataLoader.config.num_classes
@@ -45,7 +46,7 @@ class BaselineModel(LanguageModel):
   def add_classifier_model(self, rnn_output):
     print 'rnn_output has shape', rnn_output.get_shape()
     with tf.variable_scope('classifier') as scope:
-      U = tf.get_variable("U", (self.config.hidden_size * 2, self.config.num_classes))
+      U = tf.get_variable("U", (2 * self.config.hidden_size, self.config.num_classes))
       b = tf.get_variable("b", (self.config.num_classes))
     output = tf.matmul(rnn_output, U) + b
     print 'classifier_output has shape', output.get_shape()
@@ -105,8 +106,8 @@ class BaselineModel(LanguageModel):
               self.initial_state : state,
               self.dropout_placeholder : dropout,
               self.early_stop_times : lengths}
-      loss, state, total_correct = session.run(
-              [self.calculate_loss, self.final_state, self.correct_predictions],
+      loss, state, total_correct, _ = session.run(
+              [self.calculate_loss, self.final_state, self.correct_predictions, train_op],
               feed_dict=feed)
       total_processed_examples += len(x)
       total_correct_examples += total_correct
@@ -129,11 +130,11 @@ class BaselineModel(LanguageModel):
             self.initial_state : state,
             self.dropout_placeholder : 1.0,
             self.early_stop_times : lengths}
-    loss, state, predictions, total_correct = session.run(
-              [self.calculate_loss, self.final_state, self.one_hot_prediction, self.correct_predictions],
+    loss, state, predictions, total_correct, probs = session.run(
+              [self.calculate_loss, self.final_state, self.one_hot_prediction, self.correct_predictions, self.prediction],
               feed_dict=feed)
     acc = total_correct / float(len(labels))
-    return loss, acc, state, predictions
+    return loss, acc, state, predictions, labels, probs
 
 def train_baseline_model(model):
   init = tf.initialize_all_variables()
@@ -147,6 +148,8 @@ def train_baseline_model(model):
     prev_epoch_loss = float('inf')
 
     session.run(init)
+    best_acc = 0
+    best_epoch = 0
     for epoch in xrange(model.config.max_epochs):
       print 'Epoch {}'.format(epoch)
       start = time.time()
@@ -155,10 +158,15 @@ def train_baseline_model(model):
         model.X_train, model.y_train, model.lengths_train, train_op=model.train_step)
       val_pp, val_acc, _, _ = model.run_epoch(session,
         model.X_val, model.y_val, model.lengths_val)
+      if val_acc > best_acc:
+        best_acc = val_acc
+        best_epoch = epoch
       print 'Training perplexity: {}'.format(train_pp)
       print 'Training accuracy: {}'.format(train_acc)
       print 'Validation perplexity: {}'.format(val_pp)
       print 'Validation accuracy: {}'.format(val_acc)
+      print 'Best validation accuracy so far: {}'.format(best_acc)
+      print 'This accuracy was achieved during epoch: {}'.format(best_epoch)
 
       # lr annealing
       epoch_loss = np.mean(loss_history)
