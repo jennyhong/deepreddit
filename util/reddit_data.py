@@ -14,7 +14,7 @@ class DataLoader:
     self.load_data()
 
   def load_data(self):
-    self.wv, word_to_num, num_to_word = vocab.load_wv(data_dir=self.config.vocab_dir)
+    self.wv, word_to_num, self.num_to_word = vocab.load_wv(data_dir=self.config.vocab_dir)
     self.num_vocab, self.wv_dim = self.wv.shape
     self.class_names = self.config.class_names
     self.config.num_classes = len(self.class_names) #TODO: make modular lolololol
@@ -43,7 +43,7 @@ class DataLoader:
       word_to_num, class_to_num, min_length=10, full_length=self.config.lstm_size)
     self.y_test = generate_onehot(self.y_test, self.config.num_classes)
 
-  def load_datafile(self, filename, word_to_num, class_to_num, 
+  def load_datafile(self, filename, word_to_num, class_to_num,
     min_length=10, full_length=10):
     """
     min_length: All comments shorter than this number of words
@@ -70,8 +70,8 @@ class DataLoader:
         items = line.strip().split('\t')
         # In Will's reddit dataset, all comments start with <EOS>
         # TODO: Make sure this generalizes if we need to use another dataset
-        words = items[9].split()[1:]
-        
+        words = items[-1].split()[1:]
+
         if len(words) < min_length:
           continue
 
@@ -82,7 +82,7 @@ class DataLoader:
 
         while len(words) < full_length:
           words.append('<FILLER>')
-        
+
         x = list() # Add the data point to x
         for i in xrange(full_length):
           word = words[i]
@@ -100,7 +100,7 @@ class DataLoader:
     X = []
     with open(filename, 'r') as f:
       items = line.strip().split('\t')
-      words = items[9].split()[1:]
+      words = items[-1].split()[1:]
       X.append(collections.Counter(words))
     return X
 
